@@ -53,6 +53,7 @@ int pushd(char *[]);
 //int ls(char *[]);
 int cd(char *[]);
 void init_DirStack();
+void dirs();
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -309,9 +310,12 @@ void execute_command(char *args[],    /* 引数の配列 */
 
 typedef struct node{
     char*           dir_path;
+    struct node*    Prev;
     struct node*    Next;
 }node_tag;
+
 node_tag pTop;   //*Topにしたければ実態を代入する必要あり
+node_tag *pTail;   //*Topにしたければ実態を代入する必要あり
 
 
 /*-----------------------------------------------------------------------------------------------*/
@@ -321,6 +325,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_ls = "ls";
     char *p_cd = "cd";
     char *p_pushd = "pushd";
+    char *p_dirs = "dirs";
     printf("strcmp(args[0] , p_ls)==0:%d\n",strcmp(args[0] , p_ls)==0);
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
@@ -330,7 +335,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
         printf("execute:cd\n");
          printf("mainTop1:%s\n", pTop.dir_path);
         cd(args);
-            node_tag *p;
+        node_tag *p;
         int i=0;
         for(p=&pTop; p->Next != NULL ; p = p->Next){
             printf("i[%d]=",i);
@@ -342,6 +347,17 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
         printf("execute:pushd\npushd1_function\n");
         printf("mainTop1:%s\n", pTop.dir_path);
         pushd(args); 
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+        }else if (strcmp(args[0] , p_dirs)==0){
+        
+        printf("execute:dirs\n");
+        dirs(args); 
         node_tag *p;
         int i=0;
         for(p=&pTop; p->Next != NULL ; p = p->Next){
@@ -400,6 +416,7 @@ int cd(char *args[]){
 
 void init_DirStack(){
     pTop.dir_path = "Top";
+    pTop.Prev = NULL;   
     pTop.Next = NULL;   
 }
 
@@ -443,8 +460,10 @@ int pushd(char *args[]){
         printf("4\n");
 
         //NewNode->dir_path = pushd_path;
+        NewNode->Prev = p;
         NewNode->Next = NULL;
-        p->Next = NewNode;  
+        p->Next = NewNode;
+        pTail = NewNode;  
         printf("Top:%s, Next:%s\n", pTop.dir_path, NewNode->dir_path);
     
     return 0;
@@ -452,6 +471,18 @@ int pushd(char *args[]){
 //dirsコマンド
 //案：単方向リストのまま，一回値を取り出して，逆に表示する
 //案：双方向リストにして、後ろからも終えるようにする
+
+void dirs(){
+    node_tag *p;
+    int i=0;
+    p=pTail;
+    while(p->Prev != NULL){
+        printf("i[%d]=",i);
+        printf("p->dir_path:%s\n", p->dir_path);
+        i++;
+        p = p->Prev;
+    } 
+}
 
 /*void child(char *argv[MAXARGNUM]) {
   execvp(argv[0], argv);
