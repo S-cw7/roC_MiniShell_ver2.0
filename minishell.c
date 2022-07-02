@@ -54,6 +54,7 @@ int pushd(char *[]);
 int cd(char *[]);
 void init_DirStack();
 void dirs();
+int popd();
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -326,6 +327,9 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_cd = "cd";
     char *p_pushd = "pushd";
     char *p_dirs = "dirs";
+    char *p_popd = "popd";
+
+
     printf("strcmp(args[0] , p_ls)==0:%d\n",strcmp(args[0] , p_ls)==0);
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
@@ -354,9 +358,21 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
             printf("p->dir_path:%s\n", p->dir_path);
             i++;
         }  
-        }else if (strcmp(args[0] , p_dirs)==0){
+    }else if (strcmp(args[0] , p_dirs)==0){
         
         printf("execute:dirs\n");
+        dirs(args); 
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_popd)==0){
+        
+        printf("execute:popd\n");
+        popd(args);
         dirs(args); 
         node_tag *p;
         int i=0;
@@ -392,7 +408,7 @@ int cd(char *args[]){
             //異常終了
         } 
     }
-    memset(cd_path, '\0', MAX_PATH);    
+    //memset(cd_path, '\0', MAX_PATH);    
     printf("current dir : %s\n", cd_path);
     if(chdir(args[1]) != 0){ 
         printf("Couldn't move to the path\n");
@@ -469,8 +485,9 @@ int pushd(char *args[]){
     return 0;
 }
 //dirsコマンド
-//案：単方向リストのまま，一回値を取り出して，逆に表示する
-//案：双方向リストにして、後ろからも終えるようにする
+//案１：単方向リストのまま，一回値を取り出して，逆に表示する
+//案２：双方向リストにして、後ろからも終えるようにする
+//案２を採用。dirsコマンドだけでなく，popdコマンドでも末尾を使用するため．また，前から辿って後ろから再度表示させる実行時間と，node_tag->Prevに必要なデータ容量を比較してどちらが良いか。
 
 void dirs(){
     node_tag *p;
@@ -482,6 +499,18 @@ void dirs(){
         i++;
         p = p->Prev;
     } 
+}
+
+int popd(){
+    char cd_path[MAX_PATH];
+
+    if(chdir(pTail->dir_path) != 0){ 
+        printf("Couldn't move to the path\n");
+        perror("");
+        return 1;
+    }
+    
+    return 0;
 }
 
 /*void child(char *argv[MAXARGNUM]) {
