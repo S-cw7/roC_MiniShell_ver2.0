@@ -34,6 +34,7 @@
 
 #define MAX_PATH 256
 #define MAX_COMMAND 32
+#define  MAX_HISTORY 5
 
 /*typedef struct node{
     char*           dir_path;
@@ -566,6 +567,11 @@ int record_history(char* args[]){
         } 
         i++;
     }
+    /*if(i ==  MAX_HISTORY){
+        printf("ヒストリとして保存するコマンドの上限値に達しました\n");
+        printf("これ以降のコマンドは保存されません\n");
+        return 1;
+    }*/
 
     int j;
     for(j=0 ;args[j] != NULL;){
@@ -586,9 +592,9 @@ int show_history(){
     int i=0;
     int j=0;
     p=pTail_his;
-    printf("-----[history]-----------------------------------------------\n");
+    printf("-----[history_後ろから]-----------------------------------------------\n");
 
-    while(p->Prev != NULL){
+    while(p->Prev != NULL && i < MAX_HISTORY){
         printf("i[%d]=",i);
         printf("p->commands:");
         for(j=0; p->commands[j] != NULL;){
@@ -600,13 +606,42 @@ int show_history(){
         printf("\n");
     }
     printf("-----------------------------------------\n");
-
+    p = &pTop_his;
+    i = 0;
+    p = p->Next;
+        printf("-----[history_前から]-----------------------------------------------\n");
+    while(p->Next != NULL && i < MAX_HISTORY){
+        printf("i[%d]=",i);
+        printf("p->commands:");
+        for(j=0; p->commands[j] != NULL;){
+        printf("%s ", p->commands[j]);
+        j++;
+        }
+        p = p->Next;
+        i++;
+        printf("\n");
+    }
+    //ここからもっときれいにコード書けるはず
+     printf("i[%d]=",i);
+    printf("p->commands:");
+    for(j=0; p->commands[j] != NULL;){
+    printf("%s ", p->commands[j]);
+    j++;
+    }
+    printf("\n");
+    printf("-----------------------------------------\n");
     return 0;
 }
 
+
+//上限値が32個だからと言って，32こで保存をやめてしまうと，!!や!stringコマンドで不具合が出るので，結局すべて保存する
 int former_history(){
     his_tag *p;
     p = pTail_his->Prev;
+    if(p->Prev == NULL){
+        printf("Counldn't execute the former command\n");
+        exit(1);        //return 1;とすると二回目にも”!!”とすると，無限ループに入る
+    }
 //一番最初にこのコマンドを打った時にエラーを出す必要あり
     printf("former_command:%s\n", p->commands[0]); 
     printf("execute:run former commands\n");
