@@ -59,6 +59,7 @@ int popd();
 void init_HisStack();
 int record_history(char *[]);
 int show_history();
+int former_history();
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -342,6 +343,8 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_pushd = "pushd";
     char *p_dirs = "dirs";
     char *p_popd = "popd";
+    char *p_show_his = "history";
+    char *p_former_his = "!!";
 
 
     if (strcmp(args[0] , p_ls)==0){
@@ -394,8 +397,29 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
             printf("p->dir_path:%s\n", p->dir_path);
             i++;
         }  
+    }else if (strcmp(args[0] , p_show_his)==0){
+        
+        printf("execute:history\n");
+        show_history(); 
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_former_his)==0){
+        
+        printf("execute:!!\n");
+        former_history();
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
     }
-    show_history();
     printf("execute_function_end\n");
 }
 
@@ -577,6 +601,18 @@ int show_history(){
     }
     printf("-----------------------------------------\n");
 
+    return 0;
+}
+
+int former_history(){
+    his_tag *p;
+    p = pTail_his->Prev;
+//一番最初にこのコマンドを打った時にエラーを出す必要あり
+    printf("former_command:%s\n", p->commands[0]); 
+    printf("execute:run former commands\n");
+    execute_function(p->commands);      //execute_commandsでも可
+    printf("execute:record former commands\n"); 
+    record_history(p->commands); 
     return 0;
 }
 
