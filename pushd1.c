@@ -1,7 +1,7 @@
 #include <stdlib.h>     //malloc
 #include <stdio.h>
-#include <unistd.h>     //getcwd
-#define PATH_SIZE 512
+#include <unistd.h>      //getcwd
+
 
 #include "MyDefShell.h"
 

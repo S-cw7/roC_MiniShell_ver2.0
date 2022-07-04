@@ -344,12 +344,14 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_popd = "popd";
 
 
+    printf("strcmp(args[0] , p_ls)==0:%d\n",strcmp(args[0] , p_ls)==0);
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
          printf("execute:ls\n");
         // ls(args);
     }else if (strcmp(args[0] , p_cd)==0){
         printf("execute:cd\n");
+         printf("mainTop1:%s\n", pTop.dir_path);
         cd(args);
         node_tag *p;
         int i=0;
@@ -410,6 +412,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
 
 
 int cd(char *args[]){
+    printf("Top:%s\n", pTop.dir_path);
     char cd_path[MAX_PATH];
     char *HOME_path;
     if(args[1] == NULL){        //ディレクトリ名が指定されなかった場合, path_nameに環境変数 HOME に指定されたディレクトリへのパスを代入する
@@ -430,6 +433,7 @@ int cd(char *args[]){
         getcwd(cd_path, MAX_PATH);
         printf("cd_path:%s\n", cd_path);
     }
+    printf("Top:%s\n", pTop.dir_path);
     node_tag *p;
     int i=0;
     for(p=&pTop; p->Next != NULL ; p = p->Next){
@@ -453,31 +457,47 @@ int pushd(char *args[]){
     //memset(pushd_path, '\0', MAX_PATH);    
     printf("current dir : %s\n", pushd_path);
     getcwd(pushd_path, MAX_PATH);
+    printf("Top:%s\n", pTop.dir_path);
 
-
-    node_tag *p;
-    int i=0;
-    for(p=&pTop; p->Next != NULL ; p = p->Next){
-        printf("i[%d]=",i);
-        printf("p->dir_path:%s\n", p->dir_path);
-        i++;
-    }
-    node_tag *NewNode;
-    NewNode = (node_tag*)malloc(sizeof(node_tag));   
-    NewNode->dir_path = (char*)malloc(sizeof(char)*(strlen(pushd_path) + 1));
+    //もし最初に追加する場合
+    /*if(pTop.dir_path == NULL){
+        pTop.dir_path = pushd_path;
+        pTop.Next = NULL;
+        printf("1\n");
+        printf("Top:%s\n", pTop.dir_path);
     
-    if( NewNode == NULL ){
-        fputs( "メモリ割り当てに失敗しました。", stderr );
-        return 1;
-    } 
+    }else{
+    */
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }
+        printf("1\n");
+        node_tag *NewNode;
+        NewNode = (node_tag*)malloc(sizeof(node_tag));   
+        NewNode->dir_path = (char*)malloc(sizeof(char)*(strlen(pushd_path) + 1));
+        printf("2\n");
+        
+        if( NewNode == NULL ){
+            fputs( "メモリ割り当てに失敗しました。", stderr );
+            return 1;
+        } 
+        printf("3\n");
+    printf("NewNode->dir_path:%s,pushd_path:%s\n",NewNode->dir_path, pushd_path);
+    //NewNode->dir_path
+        strcpy(NewNode->dir_path, pushd_path); // 文字列はコピーする
+        printf("4\n");
 
-    strcpy(NewNode->dir_path, pushd_path); // 文字列はコピーする
-
-    NewNode->Prev = p;
-    NewNode->Next = NULL;
-    p->Next = NewNode;
-    pTail = NewNode;  
-
+        //NewNode->dir_path = pushd_path;
+        NewNode->Prev = p;
+        NewNode->Next = NULL;
+        p->Next = NewNode;
+        pTail = NewNode;  
+        printf("Top:%s, Next:%s\n", pTop.dir_path, NewNode->dir_path);
+    
     return 0;
 }
 //dirsコマンド
@@ -489,14 +509,12 @@ void dirs(){
     node_tag *p;
     int i=0;
     p=pTail;
-    printf("---[dirs]----------------------------------------------------------------\n");
     while(p->Prev != NULL){
         printf("i[%d]=",i);
         printf("p->dir_path:%s\n", p->dir_path);
         i++;
         p = p->Prev;
     } 
-    printf("-----------------------------------------------------\n");
 }
 
 int popd(){
@@ -526,14 +544,19 @@ int record_history(char* args[]){
     his_tag *p;
     int i=0;
     for(p = &pTop_his; p->Next != NULL ; p = p->Next){
+        printf("i[%d]=",i);
+        printf("p->dir_path:%s\n", p->commands[0]);
         i++;
     }
-
+    printf("1\n");
     his_tag *NewHis;
     NewHis = (his_tag*)malloc(sizeof(his_tag));  
+    printf("2\n");
 
     //for (i = 0; i < MAXARGNUM || args[i] != NULL; i++) {
     for (i = 0;  args[i] != NULL;) {
+        printf("i:%d\n",i);
+        printf("commands:%s, args:%s\n",NewHis->commands[i], args[i]);
         /* 入力文字列の長さ＋１文字分のメモリを確保し、そのアドレスをポインタ配列tableの要素として記憶する */
          NewHis->commands[i] = (char*)malloc(sizeof(char)*(strlen(args[i])+1));  
         if(  NewHis->commands[i] == NULL ){
@@ -543,17 +566,38 @@ int record_history(char* args[]){
         i++;
     }
 
+    //NewHis->commands = (char*)malloc(sizeof(char *)*(MAXARGNUM));     //もっと使用容量を減らせる***
+    printf("3\n");
+    
+    /*if( NewHis == NULL ){
+        fputs( "メモリ割り当てに失敗しました。", stderr );
+        return 1;
+    }*/ 
+    printf("4\n");
+    printf("NewHis->command:%s,args[]:%s\n",NewHis->commands[0], args[i]);
     int j;
     for(j=0 ;args[j] != NULL;){
+    //for(i = -1;  i < 10 && args[++i] != NULL;){
+        //printf("j[%d]:",j);
+        //printf("commands:%s, args:%s\n",NewHis->commands[j], args[j]);
         strcpy(NewHis->commands[j], args[j]); // 文字列はコピーする
         j++;
     }
+     printf("5\n");
+    for(j=0 ;args[j] != NULL;){
+    //for(i = -1;  i < 10 && args[++i] != NULL;){
+        printf("j[%d]:",j);
+        printf("commands:%s, args:%s\n",NewHis->commands[j], args[j]);
+        j++;
+    }
+    printf("6\n");
 
     //NewNode->dir_path = pushd_path;
     NewHis->Prev = p;
     NewHis->Next = NULL;
     p->Next = NewHis;
     pTail_his = NewHis;  
+    printf("Top:%s, Next:%s\n", pTop_his.commands[0], NewHis->commands[0]);
     return 0;
 }
 
@@ -562,8 +606,6 @@ int show_history(){
     int i=0;
     int j=0;
     p=pTail_his;
-    printf("-----[history]-----------------------------------------------\n");
-
     while(p->Prev != NULL){
         printf("i[%d]=",i);
         printf("p->commands:");
@@ -574,9 +616,7 @@ int show_history(){
         p = p->Prev;
         i++;
         printf("\n");
-    }
-    printf("-----------------------------------------\n");
-
+    } 
     return 0;
 }
 
