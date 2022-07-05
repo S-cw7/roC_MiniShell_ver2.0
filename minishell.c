@@ -7,6 +7,10 @@
 \Users\mclif\proC\2
 同一ファイルで関数としてコマンドを実行したほうが良いのか，別ファイルを作成して実行させればよいのか
 最後にファイルに分ける
+historyの保存個数について
+全て：データ容量が増える→拡張ってことにしてもいいけど。。。!!コマンドについては一つ前までのコマンドを保存しえとけば問題ない
+MAX_HISTORY：データ容量の削減。題意通り
+とりあえず、すべて保存する形式で
 --------------------------------------------------------------------------*/
 
 /*--------------------------------------------------------------------------
@@ -61,6 +65,7 @@ void init_HisStack();
 int record_history(char *[]);
 int show_history();
 int former_history();
+int search_history();
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -346,6 +351,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_popd = "popd";
     char *p_show_his = "history";
     char *p_former_his = "!!";
+    char *p_search_his = "!string";
 
 
     if (strcmp(args[0] , p_ls)==0){
@@ -413,6 +419,17 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
         
         printf("execute:!!\n");
         former_history();
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_search_his)==0){
+        
+        printf("execute:!string\n");
+        search_history();
         node_tag *p;
         int i=0;
         for(p=&pTop; p->Next != NULL ; p = p->Next){
@@ -649,6 +666,31 @@ int former_history(){
     printf("execute:record former commands\n"); 
     record_history(p->commands); 
     return 0;
+}
+
+int search_history(){
+    //MAX_HISTORYで検索
+    his_tag *p;
+    int i=0;
+    int j=0;
+    p = &pTop_his;
+
+    p = p->Next;
+    printf("-----[history_前から]-----------------------------------------------\n");
+    while(p->Next != NULL && i < MAX_HISTORY){
+        printf("i[%d]=",i);
+        printf("p->commands:");
+        for(j=0; p->commands[j] != NULL;){
+        printf("%s ", p->commands[j]);
+        j++;
+        }
+        p = p->Next;
+        i++;
+        printf("\n");
+    }
+    //****historyやdirを前から検索する関数を用意してもいいかも。show_historyで使うし。
+    //コマンドの実行
+    execute_function(p->commands);
 }
 
 /*void child(char *argv[MAXARGNUM]) {
