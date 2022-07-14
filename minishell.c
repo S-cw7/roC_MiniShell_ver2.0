@@ -65,7 +65,11 @@ void init_HisStack();
 int record_history(char *[]);
 int show_history();
 int former_history();
-int search_history();
+//int search_history();
+int string_history();
+void show_command(char *[]);
+void strcpy_skip(char*, char*, int);
+char *wildcard(char []);
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -90,6 +94,7 @@ int search_history();
 int main(int argc, char *argv[])
 {
     char command_buffer[BUFLEN]; /* コマンド用のバッファ */
+    char *buffer_p; /* コマンド用のバッファ */
     char *args[MAXARGNUM];       /* 引数へのポインタの配列 */
     int command_status;          /* コマンドの状態を表す
                                     command_status = 0 : フォアグラウンドで実行
@@ -109,7 +114,6 @@ int main(int argc, char *argv[])
          */
 
         printf("> ");
-
         /*
          *  標準入力から１行を command_buffer へ読み込む
          *  入力が何もなければ改行を出力してプロンプト表示へ戻る
@@ -119,13 +123,16 @@ int main(int argc, char *argv[])
             printf("\n");
             continue;
         }
+        printf(">>>\"%s\"\n", command_buffer);
+
 
         /*
          *  入力されたバッファ内のコマンドを解析する
          *
          *  返り値はコマンドの状態
          */
-
+        //buffer_p =wildcard(command_buffer);//ワイルドカードの実現  
+        //strcpy(&command_buffer, *buffer_p);
         command_status = parse(command_buffer, args);
         printf("status:%d\n", command_status);
 
@@ -171,6 +178,41 @@ int main(int argc, char *argv[])
  *
  *--------------------------------------------------------------------------*/
 
+char *wildcard(char buffer[]){
+    DIR *dir;
+    struct dirent *dir_elements;
+    char current_path[MAX_PATH];
+    if (dir == NULL) {
+        printf("Couldn't open the dir\n");//****
+        return 1;
+    }
+    getcwd(current_path, MAX_PATH);
+    printf("current_path:%s\n", currnt_path);
+
+/*
+    dir=opendir(path);
+    //まずワイルドカード"*"を含むかの確認
+    int i;
+    while(buffer[i] != '\0'){
+        if(buffer[i] == '*'){
+            for((dir_elements = readdir(dir)) != NULL){
+                printf("%s\n", ds->d_name);
+            }
+        }
+        i++;
+    }
+    closedir(dir);
+*/
+    return 0;
+
+}
+//エラー処理***
+//https://www.delftstack.com/ja/howto/c/opendir-in-c/#%25E3%2583%2587%25E3%2582%25A3%25E3%2583%25AC%25E3%2582%25AF%25E3%2583%2588%25E3%2583%25AA%25E3%2582%25A8%25E3%2583%25B3%25E3%2583%2588%25E3%2583%25AA%25E3%2581%25AE%25E5%258F%258D%25E5%25BE%25A9%25E5%2587%25A6%25E7%2590%2586%25E3%2581%25AB-readdir-%25E9%2596%25A2%25E6%2595%25B0%25E3%2582%2592%25E4%25BD%25BF%25E7%2594%25A8%25E3%2581%2599%25E3%2582%258B
+/*
+int wildcard(char *args[]){
+
+}
+*/
 int parse(char buffer[],        /* バッファ */
           char *args[])         /* 引数へのポインタ配列 */
 {
@@ -340,6 +382,8 @@ node_tag *pTail;   //*Topにしたければ実態を代入する必要あり
 his_tag pTop_his;   //*Topにしたければ実態を代入する必要あり
 his_tag *pTail_his;   //*Topにしたければ実態を代入する必要あり
 
+his_tag *pMid_his;   //*Topにしたければ実態を代入する必要あり
+
 /*-----------------------------------------------------------------------------------------------*/
 
 void execute_function(char* args[]){    //args[0]:コマンド名および関数名，args[1]以降：コマンドの引数
@@ -351,7 +395,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_popd = "popd";
     char *p_show_his = "history";
     char *p_former_his = "!!";
-    char *p_search_his = "!string";
+    char *p_search_his = "!";
 
 
     if (strcmp(args[0] , p_ls)==0){
@@ -426,10 +470,10 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
             printf("p->dir_path:%s\n", p->dir_path);
             i++;
         }  
-    }else if (strcmp(args[0] , p_search_his)==0){
+    }else if (strncmp(args[0] , p_search_his, 1)==0){
         
         printf("execute:!string\n");
-        search_history();
+        string_history(args);
         node_tag *p;
         int i=0;
         for(p=&pTop; p->Next != NULL ; p = p->Next){
@@ -567,9 +611,11 @@ int record_history(char* args[]){
 
     his_tag *p;
     int i=0;
+    int nHis = 0; //そのコマンドが何番目か表示するのに使用。デバッグ用
     for(p = &pTop_his; p->Next != NULL ; p = p->Next){
         i++;
     }
+    nHis = i;
 
     his_tag *NewHis;
     NewHis = (his_tag*)malloc(sizeof(his_tag));  
@@ -578,10 +624,10 @@ int record_history(char* args[]){
     for (i = 0;  args[i] != NULL;) {
         /* 入力文字列の長さ＋１文字分のメモリを確保し、そのアドレスをポインタ配列tableの要素として記憶する */
          NewHis->commands[i] = (char*)malloc(sizeof(char)*(strlen(args[i])+1));  
-        if(  NewHis->commands[i] == NULL ){
+        if( NewHis->commands[i] == NULL ){
             fputs( "メモリ割り当てに失敗しました。", stderr );
             return 1;
-        } 
+        }
         i++;
     }
     /*if(i ==  MAX_HISTORY){
@@ -601,6 +647,11 @@ int record_history(char* args[]){
     NewHis->Next = NULL;
     p->Next = NewHis;
     pTail_his = NewHis;  
+    if(nHis == MAX_HISTORY){
+        pMid_his = NewHis; 
+        printf("pMid_his commands:%s\n", pMid_his->commands[0]);     
+    } 
+    printf("commands[%d]:%s\n", nHis, NewHis->commands[0]); 
     return 0;
 }
 
@@ -611,7 +662,7 @@ int show_history(){
     p=pTail_his;
     printf("-----[history_後ろから]-----------------------------------------------\n");
 
-    while(p->Prev != NULL && i < MAX_HISTORY){
+    while(p->Prev != NULL /*&& i < MAX_HISTORY*/){
         printf("i[%d]=",i);
         printf("p->commands:");
         for(j=0; p->commands[j] != NULL;){
@@ -668,31 +719,80 @@ int former_history(){
     return 0;
 }
 
-int search_history(){
-    //MAX_HISTORYで検索
+
+int string_history(char *args[]){
     his_tag *p;
     int i=0;
-    int j=0;
-    p = &pTop_his;
+    p=pMid_his;//pMid_his < pTop_his;一つ前は確実に存在し，"!p"そのものであるために飛ばす****確認必要
+    //p=p->Prev; //一つ前は確実に存在し，"!p"そのものであるために飛ばす****確認
+    char args_tmp[MAX_COMMAND];
+printf("1\n");
+    strcpy_skip(args_tmp, args[0], 1);
+    printf("args_tmp:\"%s\", args:",args_tmp);
+    show_command(args);
+    printf("\n");
+printf("2\n");
 
-    p = p->Next;
-    printf("-----[history_前から]-----------------------------------------------\n");
-    while(p->Next != NULL && i < MAX_HISTORY){
+    while(p->Prev != NULL /*&& i < MAX_HISTORY*/){
         printf("i[%d]=",i);
         printf("p->commands:");
-        for(j=0; p->commands[j] != NULL;){
-        printf("%s ", p->commands[j]);
-        j++;
-        }
-        p = p->Next;
+        show_command(p->commands);
+        printf("\n");   
+        printf("[p->commadns[0]:%s]\n",p->commands[0]);     
+        printf("[args_tmp:%s]\n",args_tmp);     
+        if(strncmp(args_tmp, p->commands[0], strlen(args_tmp))== 0){
+            printf("execute:commands ");
+            show_command(p->commands);
+            printf("\n");
+            execute_function(p->commands);      //execute_commandsでも可
+
+            record_history(p->commands); 
+
+            return 0;
+        }//strchr(args_tmp, p->commands)
+
+        p = p->Prev;
         i++;
         printf("\n");
     }
-    //****historyやdirを前から検索する関数を用意してもいいかも。show_historyで使うし。
-    //コマンドの実行
-    execute_function(p->commands);
+    printf("Couldn't execute such a command\n");
+    return 1;
+
 }
 
+/*----------------------------------------------------------------------------
+ *
+ *  関数名   : strcpy_skip
+ *
+ *  作業内容 : 
+ *
+ *  引数     :
+ *
+ *  返り値   : なし．第一引数のsに，第二引数のtの文字配列のn文字目以降をそのまま返す．
+ *
+ *  注意     :
+ *
+ *-------------------------------------------------------------------------*/
+
+void strcpy_skip(char *s, char *t, int n)
+{
+	int	i;
+	i = n;
+
+	while((s[i-n] = t[i]) != '\0'){
+        s[i-n] = t[i];
+        i++;
+    }
+		
+}
+
+void show_command(char *command[]){
+    int i;
+    for(i=0; command[i] != NULL;){
+        printf("%s ", command[i]);
+        i++;
+    }
+}
 /*void child(char *argv[MAXARGNUM]) {
   execvp(argv[0], argv);
 }
