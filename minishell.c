@@ -37,7 +37,7 @@ MAX_HISTORY：データ容量の削減。題意通り
 #define MAXARGNUM  256     /* 最大の引数の数 */
 
 #define MAX_PATH 256
-#define MAX_COMMAND 32
+#define MAX_COMMAND 512 //32
 #define  MAX_HISTORY 5
 
 /*typedef struct node{
@@ -123,18 +123,24 @@ int main(int argc, char *argv[])
             printf("\n");
             continue;
         }
-        printf(">>>\"%s\"\n", command_buffer);
-
 
         /*
          *  入力されたバッファ内のコマンドを解析する
          *
          *  返り値はコマンドの状態
          */
-        //buffer_p =wildcard(command_buffer);//ワイルドカードの実現  
-        //strcpy(&command_buffer, *buffer_p);
+        buffer_p =wildcard(command_buffer);//ワイルドカードの実現  
+        printf("buffer_p:%s\n", buffer_p);
+        if(buffer_p != NULL){
+            strcpy(command_buffer, buffer_p);
+        }
         command_status = parse(command_buffer, args);
         printf("status:%d\n", command_status);
+
+int k=0;
+for (k = 0;  args[k] != NULL; k++) {
+printf("args[%d]:%s\n", k, args[k]);
+}
 
 
         /*
@@ -182,28 +188,44 @@ char *wildcard(char buffer[]){
     DIR *dir;
     struct dirent *dir_elements;
     char current_path[MAX_PATH];
+    char result[MAX_COMMAND];
+    char *p_result;
+    char *p;
+    int j=0;
+
+    if(strstr(buffer, "*") == NULL){
+        return NULL;
+    }
+    
+    getcwd(current_path, MAX_PATH);
+    printf("current_path:\"%s\n\"", current_path);
+
+    dir=opendir(current_path);
     if (dir == NULL) {
         printf("Couldn't open the dir\n");//****
-        return 1;
+        return 0;
     }
-    getcwd(current_path, MAX_PATH);
-    printf("current_path:%s\n", currnt_path);
 
-/*
-    dir=opendir(path);
-    //まずワイルドカード"*"を含むかの確認
-    int i;
-    while(buffer[i] != '\0'){
-        if(buffer[i] == '*'){
-            for((dir_elements = readdir(dir)) != NULL){
-                printf("%s\n", ds->d_name);
-            }
-        }
-        i++;
+
+    p = strtok(buffer, "*\n");        //"*"は1つしか含まれていないものとする
+    printf("j[%d]:%s\n",j, p);
+    strcpy(result, p);
+    while((dir_elements = readdir(dir)) != NULL){
+        printf("%s\n", dir_elements->d_name);
+        strcat(result, " ");
+        strcat(result, dir_elements->d_name);
     }
+    printf("result:%s\n", result);
+
+
+    p = strtok(NULL,"*");
+    if(p!=NULL){
+        strcat(result, p);
+    }
+    printf("result:%s\n", result);
     closedir(dir);
-*/
-    return 0;
+    p_result = &result[0];
+    return p_result;
 
 }
 //エラー処理***
