@@ -37,8 +37,10 @@ MAX_HISTORY：データ容量の削減。題意通り
 #define MAXARGNUM  256     /* 最大の引数の数 */
 
 #define MAX_PATH 256
-#define MAX_COMMAND 512 //32
+#define MAX_COMMAND 32      //512
 #define  MAX_HISTORY 5
+#define  MAX_PROMPT 16
+#define  MAX_ALIAS 32
 
 /*typedef struct node{
     char*           dir_path;
@@ -70,6 +72,14 @@ int string_history();
 void show_command(char *[]);
 void strcpy_skip(char*, char*, int);
 char *wildcard(char []);
+int ch_prompt(char *[]);
+int show_alias(char *[]);
+int record_alias();
+int alias(char *[], char*);
+int unalias(char*[]);
+
+char prompt[MAX_PROMPT] = "Command:";
+
 
 
 /*---[lsに必要な宣言など]----------------------------------------------------------------------*/
@@ -113,7 +123,7 @@ int main(int argc, char *argv[])
          *  プロンプトを表示する
          */
 
-        printf("> ");
+        printf("%s ", prompt);
         /*
          *  標準入力から１行を command_buffer へ読み込む
          *  入力が何もなければ改行を出力してプロンプト表示へ戻る
@@ -398,6 +408,8 @@ typedef struct history{
     struct history*    Next;
 }his_tag;
 
+
+
 node_tag pTop;   //*Topにしたければ実態を代入する必要あり
 node_tag *pTail;   //*Topにしたければ実態を代入する必要あり
 
@@ -410,6 +422,41 @@ his_tag *pMid_his;   //*Topにしたければ実態を代入する必要あり
 
 void execute_function(char* args[]){    //args[0]:コマンド名および関数名，args[1]以降：コマンドの引数
     printf("args[0]:%s\n", args[0]); 
+/*    char n_ls[MAX_ALIAS] = "ls";
+    char n_cd[MAX_ALIAS] = "cd";
+    char n_pushd[MAX_ALIAS] = "pushd";
+    char n_dirs[MAX_ALIAS] = "dirs";
+    char n_popd[MAX_ALIAS] = "popd";
+    char n_show_his[MAX_ALIAS] = "history";
+    char n_former_his[MAX_ALIAS] = "!!";
+    char n_search_his[MAX_ALIAS] = "!";
+    char n_prompt[MAX_ALIAS] = "prompt";
+    char n_alias[MAX_ALIAS] = "alias";
+    char n_unalias[MAX_ALIAS] = "unalias";
+*/
+   /* char n_ls = "ls";
+    char n_cd = "cd";
+    char n_pushd = "pushd";
+    char n_dirs = "dirs";
+    char n_popd = "popd";
+    char n_show_his = "history";
+    char n_former_his = "!!";
+    char n_search_his = "!";
+    char n_prompt = "prompt";
+    char n_alias = "alias";
+    char n_unalias = "unalias";
+    char *p_ls = &n_ls;
+    char *p_cd = &n_cd;
+    char *p_pushd = &n_pushd;
+    char *p_dirs = &n_dirs;
+    char *p_popd = &n_pushd;
+    char *p_show_his = &n_show_his;
+    char *p_former_his = &n_former_his;
+    char *p_search_his = &n_search_his;
+    char *p_prompt = &n_prompt;
+    char *p_alias = &n_alias;
+    char *p_unalias = &n_unalias;
+*/
     char *p_ls = "ls";
     char *p_cd = "cd";
     char *p_pushd = "pushd";
@@ -418,7 +465,9 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_show_his = "history";
     char *p_former_his = "!!";
     char *p_search_his = "!";
-
+    char *p_prompt = "prompt";
+    char *p_alias = "alias";
+    char *p_unalias = "unalias";
 
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
@@ -496,6 +545,40 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
         
         printf("execute:!string\n");
         string_history(args);
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_prompt)==0){
+        
+        printf("execute:prompt\n");
+        ch_prompt(args);
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_alias)==0){
+        
+        printf("execute:alias\n");
+        alias(args, p_pushd);
+        printf("p_command:%s\n", p_pushd);
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }  
+    }else if (strcmp(args[0] , p_unalias)==0){
+        
+        printf("execute:unalias\n");
+        unalias(args);
         node_tag *p;
         int i=0;
         for(p=&pTop; p->Next != NULL ; p = p->Next){
@@ -815,8 +898,58 @@ void show_command(char *command[]){
         i++;
     }
 }
-/*void child(char *argv[MAXARGNUM]) {
-  execvp(argv[0], argv);
+
+int  ch_prompt(char *args[]){
+    char str_prompt[MAX_PROMPT];
+    if(strlen(args[1]) > MAX_PROMPT){
+        printf("Counldn't change prompt\n");
+        return 1;
+    }
+    strcpy(prompt, args[1]);
+    printf("prompt:%s, args[1]:%s\n",prompt, args[1]);
+
+
+    return 0;
 }
-*/
+int alias(char *args[], char *p_command){
+    if(args[1] == NULL){
+        show_alias(args);
+    }else{
+        //command2のポインタを探す
+        //[案１]関数呼び出し前に探索→この関数に渡してもらう
+        char *p_new_command;
+        //動的にコマンド別名のchar型配列を確保する
+        p_new_command = (char*)malloc(sizeof(char)*(MAX_ALIAS+1));
+        if(p_new_command==NULL){
+            printf("Couldn't change the name of the command\n");
+            return 1;
+        }
+        if(strlen(args[1]) > MAX_ALIAS){
+            printf("Couldn't change the name of the command\n");
+            return 1;            
+        }       //***まとめてもいいかも
+        strcpy(p_new_command, args[1]);
+        //command2のポインタにcommand1のポインタを代入する
+printf("1,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
+        p_command = p_new_command;
+printf("2,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
+
+        return ;
+
+    }
+}
+//最後とunalias時にfreeを忘れない
+//s2の指しているデータを、s1にコピーします。s1の指すメモリブロックの大きさがs2のそれよりも小さいと、他のデータに上書きをしてしまう可能性があります。その結果、何が起こるか予測がつきません。動作が異常になるか、最悪の場合システムがクラッシュして暴走します
+
+int show_alias(char *args[]){
+    return 0;
+}
+
+int record_alias(){
+    return 0;
+}
+
+int unalias(char *args[]){
+    return 0;
+}
 /*-- END OF FILE -----------------------------------------------------------*/
