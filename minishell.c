@@ -61,7 +61,7 @@ int pushd(char *[]);
 //int ls(char *[]);
 int cd(char *[]);
 void init_DirStack();
-void dirs();
+int dirs();
 int popd();
 void init_HisStack();
 int record_history(char *[]);
@@ -73,9 +73,11 @@ void show_command(char *[]);
 void strcpy_skip(char*, char*, int);
 char *wildcard(char []);
 int ch_prompt(char *[]);
-int show_alias(char *[]);
-int record_alias();
+
 char* alias(char *[], char*);
+void init_AliasStack();
+int show_alias();
+int record_alias();
 int unalias(char*[]);
 
 char prompt[MAX_PROMPT] = "Command:";
@@ -117,6 +119,7 @@ int main(int argc, char *argv[])
      */
     init_DirStack();
     init_HisStack();
+    init_AliasStack();
     for(;;) {
 
         /*
@@ -408,7 +411,12 @@ typedef struct history{
     struct history*    Next;
 }his_tag;
 
-
+typedef struct alias{
+    char* command;
+    char* new_command;
+    //struct alias*    Prev;//要らないかも
+    struct alias*    Next;
+}alias_tag;
 
 node_tag pTop;   //*Topにしたければ実態を代入する必要あり
 node_tag *pTail;   //*Topにしたければ実態を代入する必要あり
@@ -417,6 +425,8 @@ his_tag pTop_his;   //*Topにしたければ実態を代入する必要あり
 his_tag *pTail_his;   //*Topにしたければ実態を代入する必要あり
 
 his_tag *pMid_his;   //*Topにしたければ実態を代入する必要あり
+
+alias_tag pTop_alias;
 
 /*-----------------------------------------------------------------------------------------------*/
 
@@ -433,7 +443,7 @@ his_tag *pMid_his;   //*Topにしたければ実態を代入する必要あり
     char *p_unalias = "unalias";
 
 void execute_function(char* args[]){    //args[0]:コマンド名および関数名，args[1]以降：コマンドの引数
-    printf("args[0]:%s\n", args[0]); 
+    printf("execute_function_args[0]:%s\n", args[0]); 
 /*    char n_ls[MAX_ALIAS] = "ls";
     char n_cd[MAX_ALIAS] = "cd";
     char n_pushd[MAX_ALIAS] = "pushd";
@@ -470,7 +480,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_unalias = &n_unalias;
 */
 
-
+printf("p_pushd:%s\n", p_pushd);
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
          printf("execute:ls\n");
@@ -678,11 +688,15 @@ int pushd(char *args[]){
 //案２：双方向リストにして、後ろからも終えるようにする
 //案２を採用。dirsコマンドだけでなく，popdコマンドでも末尾を使用するため．また，前から辿って後ろから再度表示させる実行時間と，node_tag->Prevに必要なデータ容量を比較してどちらが良いか。
 
-void dirs(){
+int  dirs(){
     node_tag *p;
     int i=0;
     p=pTail;
     printf("---[dirs]----------------------------------------------------------------\n");
+    if(p->Prev == NULL){    //  何もスタックされていない状態で表示を求められたとき
+        printf("Nothing is stored in the directory stack.\n");        
+        return 0;
+    }
     while(p->Prev != NULL){
         printf("i[%d]=",i);
         printf("p->dir_path:%s\n", p->dir_path);
@@ -690,6 +704,7 @@ void dirs(){
         p = p->Prev;
     } 
     printf("-----------------------------------------------------\n");
+    return 0;
 }
 
 int popd(){
@@ -915,7 +930,9 @@ int  ch_prompt(char *args[]){
 }
 char* alias(char *args[], char *p_command){
     if(args[1] == NULL){
-        show_alias(args);
+        show_alias();
+        printf("end execute show_alias\n");
+        return NULL;
     }else{
         //command2のポインタを探す
         //[案１]関数呼び出し前に探索→この関数に渡してもらう
@@ -935,6 +952,8 @@ char* alias(char *args[], char *p_command){
 printf("1,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
         //p_command = p_new_command;
 printf("2,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
+        record_alias(p_command, p_new_command);
+        show_alias();
 
         return p_new_command;
 
@@ -942,16 +961,69 @@ printf("2,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
 }
 //最後とunalias時にfreeを忘れない
 //s2の指しているデータを、s1にコピーします。s1の指すメモリブロックの大きさがs2のそれよりも小さいと、他のデータに上書きをしてしまう可能性があります。その結果、何が起こるか予測がつきません。動作が異常になるか、最悪の場合システムがクラッシュして暴走します
-
-int show_alias(char *args[]){
-    return 0;
+void init_AliasStack(){
+/* 配列tableの各要素（ポインタ）をNULLポインタで初期化 */
+    pTop_alias.command =NULL;
+    pTop_alias.new_command = NULL; 
+    pTop_alias.Next = NULL;   
 }
 
-int record_alias(){
+
+int show_alias(){
+    alias_tag *p;
+    int i=0;
+    int j=0;
+    p = &pTop_alias;
+    if(p->Next == NULL){    //  何も記録していない状態で表示を求められたとき
+        printf("-----[alias_前から]-----------------------------------------------\n"); 
+        printf("No alias is set.\n");
+        printf("-----------------------------------------\n");
+        
+        return 0;
+    }
+    p = p->Next;
+    printf("-----[alias_前から]-----------------------------------------------\n");
+    while(p->Next != NULL){
+        printf("i[%d]=",i);
+        printf("p->command:%s p->new_command:%s\n", p->command, p->new_command);
+        p = p->Next;
+        i++;
+    }
+    //ここまでだけだと、最後の一つが表示されない
+    printf("i[%d]=",i);
+    printf("p->command:%s p->new_command:%s\n", p->command, p->new_command);
+    printf("-----------------------------------------\n");
+    return 0;
+}
+//hisやstackを利用して、短方向リストでするか、配列の動的確保で実現するか
+//単方向リストは削除が新たに作るのが手間だが、配列では二つの情報を保存できない
+int record_alias(char *p_command, char *p_new_command){
+printf("0\n");
+  
+    alias_tag *p;
+    int i=0;
+    int nalias = 0; //そのコマンドが何番目か表示するのに使用。デバッグ用
+    for(p = &pTop_alias; p->Next != NULL ; p = p->Next){
+        i++;
+    }
+printf("1\n");
+    nalias = i;
+    alias_tag *Newalias;
+    Newalias = (alias_tag*)malloc(sizeof(alias_tag));
+printf("2\n");
+
+    Newalias->command = p_command;  
+    Newalias->new_command = p_new_command; 
+    Newalias->Next = NULL; 
+    p->Next = Newalias;
+   // pTail_his = NewHis;***  
+printf("3\n");
+
     return 0;
 }
 
 int unalias(char *args[]){
+
     return 0;
 }
 /*-- END OF FILE -----------------------------------------------------------*/
