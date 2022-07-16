@@ -75,7 +75,7 @@ char *wildcard(char []);
 int ch_prompt(char *[]);
 int show_alias(char *[]);
 int record_alias();
-int alias(char *[], char*);
+char* alias(char *[], char*);
 int unalias(char*[]);
 
 char prompt[MAX_PROMPT] = "Command:";
@@ -420,6 +420,18 @@ his_tag *pMid_his;   //*Topにしたければ実態を代入する必要あり
 
 /*-----------------------------------------------------------------------------------------------*/
 
+    char *p_ls = "ls";
+    char *p_cd = "cd";
+    char *p_pushd = "pushd";
+    char *p_dirs = "dirs";
+    char *p_popd = "popd";
+    char *p_show_his = "history";
+    char *p_former_his = "!!";
+    char *p_search_his = "!";
+    char *p_prompt = "prompt";
+    char *p_alias = "alias";
+    char *p_unalias = "unalias";
+
 void execute_function(char* args[]){    //args[0]:コマンド名および関数名，args[1]以降：コマンドの引数
     printf("args[0]:%s\n", args[0]); 
 /*    char n_ls[MAX_ALIAS] = "ls";
@@ -457,17 +469,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     char *p_alias = &n_alias;
     char *p_unalias = &n_unalias;
 */
-    char *p_ls = "ls";
-    char *p_cd = "cd";
-    char *p_pushd = "pushd";
-    char *p_dirs = "dirs";
-    char *p_popd = "popd";
-    char *p_show_his = "history";
-    char *p_former_his = "!!";
-    char *p_search_his = "!";
-    char *p_prompt = "prompt";
-    char *p_alias = "alias";
-    char *p_unalias = "unalias";
+
 
     if (strcmp(args[0] , p_ls)==0){
         //ls(args);
@@ -566,7 +568,7 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
     }else if (strcmp(args[0] , p_alias)==0){
         
         printf("execute:alias\n");
-        alias(args, p_pushd);
+        p_pushd = alias(args, p_pushd);
         printf("p_command:%s\n", p_pushd);
         node_tag *p;
         int i=0;
@@ -911,7 +913,7 @@ int  ch_prompt(char *args[]){
 
     return 0;
 }
-int alias(char *args[], char *p_command){
+char* alias(char *args[], char *p_command){
     if(args[1] == NULL){
         show_alias(args);
     }else{
@@ -922,19 +924,19 @@ int alias(char *args[], char *p_command){
         p_new_command = (char*)malloc(sizeof(char)*(MAX_ALIAS+1));
         if(p_new_command==NULL){
             printf("Couldn't change the name of the command\n");
-            return 1;
+            return NULL;
         }
         if(strlen(args[1]) > MAX_ALIAS){
             printf("Couldn't change the name of the command\n");
-            return 1;            
+            return NULL;            
         }       //***まとめてもいいかも
         strcpy(p_new_command, args[1]);
         //command2のポインタにcommand1のポインタを代入する
 printf("1,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
-        p_command = p_new_command;
+        //p_command = p_new_command;
 printf("2,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
 
-        return ;
+        return p_new_command;
 
     }
 }
