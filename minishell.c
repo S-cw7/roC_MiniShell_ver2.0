@@ -58,7 +58,7 @@ int parse(char [], char *[]);
 void execute_command(char *[], int);
 void execute_function(char *[]);
 int pushd(char *[]);
-//int ls(char *[]);
+int ls(char *[]);
 int cd(char *[]);
 void init_DirStack();
 int dirs();
@@ -74,11 +74,12 @@ void strcpy_skip(char*, char*, int);
 char *wildcard(char []);
 int ch_prompt(char *[]);
 
-char* alias(char *[], char*);
+int alias(char *[]);
 void init_AliasStack();
 int show_alias();
 int record_alias();
 int unalias(char*[]);
+int check_alias(char*[]);
 
 char prompt[MAX_PROMPT] = "Command:";
 
@@ -441,6 +442,22 @@ alias_tag pTop_alias;
     char *p_prompt = "prompt";
     char *p_alias = "alias";
     char *p_unalias = "unalias";
+/*
+char *str_commands[] = {
+    "ls"
+    "cd",
+    "pushd",
+    "dirs",
+    "popd",
+    "history",
+    "!!",
+    "!",
+    "prompt",
+    "alias",
+    "unalias"
+}
+
+*/
 
 void execute_function(char* args[]){    //args[0]:コマンド名および関数名，args[1]以降：コマンドの引数
     printf("execute_function_args[0]:%s\n", args[0]); 
@@ -482,9 +499,8 @@ void execute_function(char* args[]){    //args[0]:コマンド名および関数
 
 printf("p_pushd:%s\n", p_pushd);
     if (strcmp(args[0] , p_ls)==0){
-        //ls(args);
-         printf("execute:ls\n");
-        // ls(args);
+        printf("execute:ls\n");
+        ls(args);
     }else if (strcmp(args[0] , p_cd)==0){
         printf("execute:cd\n");
         cd(args);
@@ -578,7 +594,7 @@ printf("p_pushd:%s\n", p_pushd);
     }else if (strcmp(args[0] , p_alias)==0){
         
         printf("execute:alias\n");
-        p_pushd = alias(args, p_pushd);
+        alias(args);
         printf("p_command:%s\n", p_pushd);
         node_tag *p;
         int i=0;
@@ -598,6 +614,17 @@ printf("p_pushd:%s\n", p_pushd);
             printf("p->dir_path:%s\n", p->dir_path);
             i++;
         }  
+    }else{
+             
+        printf("execute:check alias\n");
+        check_alias(args);
+        node_tag *p;
+        int i=0;
+        for(p=&pTop; p->Next != NULL ; p = p->Next){
+            printf("i[%d]=",i);
+            printf("p->dir_path:%s\n", p->dir_path);
+            i++;
+        }     
     }
     printf("execute_function_end\n");
 }
@@ -928,11 +955,11 @@ int  ch_prompt(char *args[]){
 
     return 0;
 }
-char* alias(char *args[], char *p_command){
+int alias(char *args[]){
     if(args[1] == NULL){
         show_alias();
         printf("end execute show_alias\n");
-        return NULL;
+        return 0;
     }else{
         //command2のポインタを探す
         //[案１]関数呼び出し前に探索→この関数に渡してもらう
@@ -941,24 +968,46 @@ char* alias(char *args[], char *p_command){
         p_new_command = (char*)malloc(sizeof(char)*(MAX_ALIAS+1));
         if(p_new_command==NULL){
             printf("Couldn't change the name of the command\n");
-            return NULL;
+            return 1;
         }
         if(strlen(args[1]) > MAX_ALIAS){
             printf("Couldn't change the name of the command\n");
-            return NULL;            
+            return 1;            
         }       //***まとめてもいいかも
         strcpy(p_new_command, args[1]);
         //command2のポインタにcommand1のポインタを代入する
-printf("1,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
-        //p_command = p_new_command;
-printf("2,p_command:%s,  p_new_command:%s\n", p_command, p_new_command);
-        record_alias(p_command, p_new_command);
+printf("1,p_command:%s,  p_new_command:%s\n", args[2], p_new_command);
+        //p_pushd = p_new_command;
+printf("2,p_command:%s,  p_new_command:%s\n", args[2], p_new_command);
+        record_alias(args[2], p_new_command);
         show_alias();
 
-        return p_new_command;
+        return 0;
 
     }
 }
+
+int check_alias(char* args[]){
+    alias_tag *p;
+    int i=0;
+    p = &pTop_alias;
+    if(p->Next == NULL){    //  何も記録していない状態で表示を求められたとき
+        printf("No alias is set.\n");
+        return 0;
+    }
+    p = p->Next;
+    while(p != NULL){   //p->Next != NULL
+        if(strcmp(p->new_command, args[0]) == 0){
+            args[0] = p->command;
+            printf("args[0]:%s\n", args[0]);
+            execute_function(args);
+        }
+        p = p->Next;
+        i++;
+    }
+    return 0;
+}
+
 //最後とunalias時にfreeを忘れない
 //s2の指しているデータを、s1にコピーします。s1の指すメモリブロックの大きさがs2のそれよりも小さいと、他のデータに上書きをしてしまう可能性があります。その結果、何が起こるか予測がつきません。動作が異常になるか、最悪の場合システムがクラッシュして暴走します
 void init_AliasStack(){
@@ -972,7 +1021,6 @@ void init_AliasStack(){
 int show_alias(){
     alias_tag *p;
     int i=0;
-    int j=0;
     p = &pTop_alias;
     if(p->Next == NULL){    //  何も記録していない状態で表示を求められたとき
         printf("-----[alias_前から]-----------------------------------------------\n"); 
@@ -1025,5 +1073,33 @@ printf("3\n");
 int unalias(char *args[]){
 
     return 0;
+}
+
+int ls(char *args[]){
+    DIR *dir;
+    struct dirent *dir_info;
+
+    char current_path[MAX_PATH];
+    getcwd(current_path, MAX_PATH);
+    printf("current dir : %s\n", current_path);
+    char *path =  current_path;
+
+    if (args[1] != NULL){
+        path = args[1];
+    }
+    printf("path:%s\n", path);
+    dir = opendir(path);
+
+    if (dir == NULL){
+        printf("Error\n");
+        return 1;
+    }
+
+    while((dir_info = readdir(dir)) != NULL){
+        printf("%s\n", dir_info->d_name);
+    }
+    closedir(dir);
+    return 0;
+    
 }
 /*-- END OF FILE -----------------------------------------------------------*/
