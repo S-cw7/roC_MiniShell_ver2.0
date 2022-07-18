@@ -18,11 +18,12 @@ MAX_HISTORY：データ容量の削減。題意通り
  --------------------------------------------------------------------------*/
 #include <err.h>
 //#include <direct.h> // _getcwd
-#include <dirent.h>     //opendir, readdir, closedir
+#include <dirent.h>     //opendir, readdir, closedir,_mkdir
+#include <sys/stat.h>   //_mkdir
 #include <stdio.h>      //perror
 #include <stdlib.h>     //malloc, //getenv
 #include <sys/types.h>
-#include <unistd.h>     //getcwd, chdir
+#include <unistd.h>     //getcwd, chdir, rmdir
 #include <sys/wait.h>
 #include<string.h> //strcmp
 #include<ctype.h>   //isgraph
@@ -42,6 +43,8 @@ MAX_HISTORY：データ容量の削減。題意通り
 #define  MAX_HISTORY 5
 #define  MAX_PROMPT 16
 #define  MAX_ALIAS 32
+#define MAX_LINES 1024      //cat関数で使用
+#define  MAX_CHAR  512      //cat関数で使用
 
 /*typedef struct node{
     char*           dir_path;
@@ -83,11 +86,14 @@ int alias(char *[]);
 void init_AliasStack();
 int show_alias();
 int record_alias();
-int unalias(char*[]);
-int check_alias(char*[]);
-int delete_alias(char*[]);
+int unalias(char *[]);
+int check_alias(char *[]);
+int delete_alias(char *[]);
 
-int rm(char*[]);
+int rm(char *[]);
+int my_mkdir(char *[]);
+int my_rmdir(char *[]);
+int cat(char *[]);
 
 char prompt[MAX_PROMPT] = "Command:";
 
@@ -564,7 +570,10 @@ char *str_commands[] = {
     "prompt",
     "alias",
     "unalias",
-    "rm"
+    "rm",
+    "mkdir",
+    "rmdir",
+    "cat"
 };
 int (*funcs_command[])(char *[]) = {
     &ls,
@@ -579,7 +588,10 @@ int (*funcs_command[])(char *[]) = {
     &func_prompt,
     &alias,
     &unalias,
-    &rm
+    &rm,
+    &my_mkdir,
+    &my_rmdir,
+    &cat
 }; 
 int num_funcs() {
     return sizeof(str_commands) / sizeof(char *);
@@ -1458,112 +1470,359 @@ int rm(char* args[]){
     //rm [なし/-i] [ファイル名]：ファイルを削除する。-iで確認メッセージを表示する
     //ただしファイルはカレントディレクトリにあるものとする．
     char current_path[MAX_PATH];
-    char args_file[MAX_COMMAND];
-    char flag=0;
-    char c;
+    char file[MAX_PATH];
+    char c[1];
 
     if(getcwd(current_path, MAX_PATH) == NULL){
         printf("Couldn't get the current directory.\n");
         return 1;
     }
-    printf("%s\n", current_path);
-    int i;
-    if(strcmp(args[1], "-i") == 0){
-        for(i=2; args[i] !=NULL ; i++){
-            if(strlen(args[i]) > MAX_COMMAND){
-                printf("The name of command is too long.\n");
-                return 1;
-            }
-            strcpy(args_file,args[i]);
-            if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
-                printf("The name of the path is too long\n");
-                return 1;
-            }
-            strcat(current_path, "/");
-            strcat(current_path, args_file);
-            printf("%s\n", current_path);
-            printf("rm: remove directory \"%s\"?(y/n):", args_file);
-            c=getchar();
-            if(strncmp(&c, "y", 1)!=0){
-                continue;
-            }
-            if(remove(current_path) == 0){
-                printf("%sを削除しました。\n", args_file);
-            }else{
-                printf("rm:Couldn't remove \"%s\"\n", args_file);
-            }
-        }
- 
-        flag = 1;
-    }else{
-        for(i=1; args[i] !=NULL ; i++){
-            if(strlen(args[i]) > MAX_COMMAND){
-                printf("The name of command is too long.\n");
-                return 1;
-            }
-            strcpy(args_file,args[i]);
-            if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
-                printf("The name of the path is too long\n");
-                return 1;
-            }
-            strcat(current_path, "/");
-            strcat(current_path, args_file);
-            printf("%s\n", current_path);
-            if(strncmp(&c, "y", 1)!=0){
-                continue;
-            }
-            if(remove(current_path) == 0){
-                printf("%sを削除しました。\n", args_file);
-            }else{
-                printf("rm:Couldn't remove \"%s\"\n", args_file);
-            }
-        }
- 
-    }
 
- /*   int i;
-    if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
+    if((strlen(current_path)+1) > MAX_PATH){//+1は/のため, strcpyとstrcatの両方のエラー検出
         printf("The name of the path is too long\n");
         return 1;
     }
     strcat(current_path, "/");
-    strcat(current_path, args_file);
     printf("%s\n", current_path);
 
-    if(flag == 1){      //確認メッセージあり
-       printf("rm: remove directory \"%s\"?(y/n):", args_file);
-        c=getchar();
-        if(strncmp(&c, "y", 1)!=0){
-            return 0;
-        }
-    }else{              //確認メッセージなし
+    int i;
+    if(strcmp(args[1], "-i") == 0){
+        for(i=2; args[i] !=NULL ; i++){
+            strcpy(file,current_path);
 
-    }
-    if(remove(current_path) == 0){
-        printf("%sを削除しました。\n", args_file);
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+            printf("rm: remove directory \"%s\"?(y/n):", args[i]);
+            scanf("%1s%*[^\n]", c);
+            getchar();
+            //https://marycore.jp/prog/c-lang/scanf-string-safely/
+
+            if(strncmp(c, "y", 1)!=0){
+                continue;
+            }
+            if(remove(file) == 0){
+                printf("%sを削除しました。\n", args[i]);
+            }else{
+                printf("rm:Couldn't remove \"%s\"\n", args[i]);
+            }
+        }
     }else{
-        printf("rm:Couldn't remove \"%s\"\n", args_file);
+        for(i=1; args[i] !=NULL ; i++){
+
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+            if(remove(file) == 0){
+                printf("%sを削除しました。\n", args[i]);
+            }else{
+                printf("rm:Couldn't remove \"%s\"\n", args[i]);
+            }
+        }
+ 
     }
-*/
     return 0;
 }
 
 
-int mkdir(char* args[]){
+int my_mkdir(char *args[]){
     //mkdir [-p/なし] [ディレクトリ名s]：－pを付けると途中のディレクトリも含めて作成する。
     //p71
+    //指定したディレクトリが既に存在する場合、mkdir関数は失敗します。
+    //指定したディテクトリ名に存在しないディレクトリ名が含まれる場合も失敗します。
+    //ただしファイルはカレントディレクトリにあるものとする．
+    char current_path[MAX_PATH];
+    char file[MAX_PATH];
+    char c[1];
+
+    if(getcwd(current_path, MAX_PATH) == NULL){
+        printf("Couldn't get the current directory.\n");
+        return 1;
+    }
+
+    if((strlen(current_path)+1) > MAX_PATH){//+1は/のため, strcpyとstrcatの両方のエラー検出
+        printf("The name of the path is too long\n");
+        return 1;
+    }
+    strcat(current_path, "/");
+    printf("%s\n", current_path);
+    //オプションはなしで
+    int i;
+    for(i=1; args[i] !=NULL ; i++){
+        strcpy(file,current_path);
+
+        if((strlen(args[i])+strlen(file)) > MAX_PATH){
+            printf("The name of command is too long.\n");
+            return 1;
+        }
+        strcat(file,args[i]);
+        printf("%s\n", file);
+        if (mkdir(file,
+                S_IRUSR | S_IWUSR | S_IXUSR |
+                S_IRGRP | S_IWGRP | S_IXGRP |
+                S_IROTH | S_IWOTH | S_IXOTH) == 0){
+            printf("ディレクトリ%sを作成しました。\n", file);
+        }else{
+            printf("Couldn't create a new directory.\n。");
+
+        }
+
+    }
     return 0;
 }
 
 
-/*int rmdir(char* args[]){
+int my_rmdir(char* args[]){
     //rmdir [-ri/-p/なし] [ディレクトリ名s]:－riを付けると確認しながらディレクトリを削除する。ただし空のディレクトリしか削除できない。
     //－pを付けると途中のディレクトリも含めて削除する。p72
     //ディレクトリの削除
+
+    char current_path[MAX_PATH];
+    char file[MAX_PATH];
+    char c[1];
+
+    if(getcwd(current_path, MAX_PATH) == NULL){
+        printf("Couldn't get the current directory.\n");
+        return 1;
+    }
+
+    if((strlen(current_path)+1) > MAX_PATH){//+1は/のため, strcpyとstrcatの両方のエラー検出
+        printf("The name of the path is too long\n");
+        return 1;
+    }
+    strcat(current_path, "/");
+    printf("%s\n", current_path);
+//オプションはなし/-riのみで→－pを付けると途中のディレクトリも含めて削除する(https://nidea.jp/lang-c/2022/01/directory-delete/#index_id0)
+//空ディレクトリのみ
+    int i;
+    if(strcmp(args[1], "-ri") == 0){
+        for(i=2; args[i] !=NULL ; i++){
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+            printf("rm: remove directory \"%s\"?(y/n):", args[i]);
+            scanf("%1s%*[^\n]", c);
+            getchar();
+            //https://marycore.jp/prog/c-lang/scanf-string-safely/
+
+            if(strncmp(c, "y", 1)!=0){
+                printf("No\n");
+                continue;
+            }
+            if (rmdir(file) == 0){
+                printf("ディレクトリ%sを削除しました。\n", file);
+            }else{
+                printf("Couldn't remove \"%s\" directory.\n。",file);
+
+            }
+
+        }
+    }else{
+        for(i=1; args[i] !=NULL ; i++){
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+            if (rmdir(file) == 0){
+                printf("ディレクトリ%sを削除しました。\n", file);
+            }else{
+                printf("Couldn't remove \"%s\" directory.\n。",file);
+
+            }
+
+        }
+ 
+    }
     return 0;
-}*/
+}
+
 int cat(char* args[]){
     //cat [-n/-b/なし] [ファイル名]：-nで行番号を，-bで空白を除いて行番号を振って，ファイルの内容を表示する．
+   //-l 数字でその数字の行数だけ表示
+   //バグ：-l, -b,完成：なし,-n
+   //p46
+
+    char current_path[MAX_PATH];
+    char file[MAX_PATH];
+    char c[1];
+    char ch;    // 読み込んだテキストを格納
+    FILE *fp;
+    fpos_t pos;
+    int i, n_line, count;
+    char str_line[MAX_CHAR];
+    long out_line;
+
+    if(getcwd(current_path, MAX_PATH) == NULL){
+        printf("Couldn't get the current directory.\n");
+        return 1;
+    }
+
+    if((strlen(current_path)+1) > MAX_PATH){//+1は/のため, strcpyとstrcatの両方のエラー検出
+        printf("The name of the path is too long\n");
+        return 1;
+    }
+    strcat(current_path, "/");
+    printf("%s\n", current_path);
+
+    if(strcmp(args[1], "-n") == 0){
+        for(i=2; args[i] !=NULL ; i++){
+            n_line = 1;
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+
+            // ファイルオープン 
+            fp = fopen(file, "r");
+            //ファイルが適切に読み込まれているかのを確認する
+            if( fp == NULL ) {
+                printf("Couldn't open  %s\n", args[i]);
+                return 1;
+            }
+            
+            //テキストの読み込み&出力 
+            printf("▼---[%s]------------------------------------------------------▼\n", args[i]);
+            while(fgets(str_line, MAX_CHAR, fp) != NULL) {
+                printf("%4d:",n_line);
+                n_line++;
+                printf("%s", str_line);
+            }
+            printf("\n---------------------------------------------\n");
+            fclose(fp);
+
+        }
+    }else if(strcmp(args[1], "-b") == 0){
+        for(i=2; args[i] !=NULL ; i++){
+            n_line = 1;
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+
+            // ファイルオープン 
+            fp = fopen(file, "r");
+            //ファイルが適切に読み込まれているかのを確認する
+            if( fp == NULL ) {
+                printf("Couldn't open  %s\n", args[i]);
+                return 1;
+            }
+            
+            //テキストの読み込み&出力 
+            printf("▼---[%s]------------------------------------------------------▼\n", args[i]);
+            while(fgets(str_line, MAX_CHAR, fp) != NULL) {
+                if(*str_line == '\n'){
+                    continue;
+                    printf("skip\n");
+                }
+                printf("%4d:",n_line);
+                n_line++;
+                printf("%s", str_line);
+            }
+            printf("\n---------------------------------------------\n");
+            fclose(fp);
+        }
+    }else if(strcmp(args[1], "-l") == 0){
+        if(out_line = strtol(args[2], NULL, 10) == 0){
+            printf("The arguments are invaild.\n");
+            return 1;
+        }
+        for(i=3; args[i] !=NULL ; i++){     //args[2] は数字
+            n_line = 1;
+            strcpy(file,current_path);
+            count = 0;
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+
+            // ファイルオープン 
+            fp = fopen(file, "r");
+            //ファイルが適切に読み込まれているかのを確認する
+            if( fp == NULL ) {
+                printf("Couldn't open  %s\n", args[i]);
+                return 1;
+            }
+            
+            //テキストの読み込み&出力 
+            printf("▼---[%s]------------------------------------------------------▼\n", args[i]);
+            while(fgets(str_line, MAX_CHAR, fp) != NULL) {
+                if(count == out_line){
+                    scanf("%1s%*[^\n]", c);
+                    count = 0;
+                }
+                printf("%4d:",n_line);
+                n_line++;
+                printf("%s", str_line);
+                count++;
+            }
+            printf("\n---------------------------------------------\n");
+            fclose(fp);
+        }
+    }else{
+        for(i=1; args[i] !=NULL ; i++){
+            strcpy(file,current_path);
+
+            if((strlen(args[i])+strlen(file)) > MAX_PATH){
+                printf("The name of command is too long.\n");
+                return 1;
+            }
+            strcat(file,args[i]);
+            printf("%s\n", file);
+
+            // ファイルオープン 
+            fp = fopen(file, "r");
+            //ファイルが適切に読み込まれているかのを確認する
+            if( fp == NULL ) {
+                printf("Couldn't open  %s\n", args[i]);
+                return 1;
+            }
+            
+            //テキストの読み込み&出力 
+            printf("▼---[%s]------------------------------------------------------▼\n", args[i]);
+            while(fgets(str_line, MAX_CHAR, fp) != NULL) {
+                printf("%s", str_line);
+            }
+            printf("\n---------------------------------------------\n");
+    //***本当はファイルの末尾が改行文字かどうかで"\n"の有無を判断できればよい
+    /*      fgetpos( fp, &pos );
+            if(strncmp((&ch-1), "\n", 1) != 0){
+                printf("*(&ch-1):%c",*(&ch-1));
+                printf("\n");
+            }
+    */
+            fclose(fp);
+
+        }
+    }
+  
     return 0;
 }
 
@@ -1573,5 +1832,6 @@ int find(char* args[]){
     return 0;
 }
 
+//current file作成の関数作ってもいいかも****
 
 /*-- END OF FILE -----------------------------------------------------------*/
