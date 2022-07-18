@@ -25,7 +25,6 @@ MAX_HISTORY：データ容量の削減。題意通り
 #include <unistd.h>     //getcwd, chdir
 #include <sys/wait.h>
 #include<string.h> //strcmp
-#include<ctype.h>   //isgraph
 
 //#include "MyDefShell.h"
 
@@ -60,7 +59,6 @@ void execute_command(char *[], int);
 void execute_function(char *[]);
 int pushd(char *[]);
 int ls(char *[]);
-int pwd(char *[]);
 int cd(char *[]);
 void init_DirStack();
 int dirs();
@@ -86,8 +84,6 @@ int record_alias();
 int unalias(char*[]);
 int check_alias(char*[]);
 int delete_alias(char*[]);
-
-int rm(char*[]);
 
 char prompt[MAX_PROMPT] = "Command:";
 
@@ -160,10 +156,11 @@ int main(int argc, char *argv[])
         }
         */
         if(strstr(command_buffer, "*") != NULL){
-            if((buffer_p =wildcard(command_buffer)) == NULL){
+            if(wildcard(command_buffer) == NULL){
                 printf("2.The command is too long.\n");
                 continue;         
             }else{
+                buffer_p = wildcard(command_buffer);
                 printf("buffer_p:%s\n", buffer_p);
                 if(buffer_p != NULL){
                     strcpy(command_buffer, buffer_p);
@@ -224,12 +221,10 @@ char *wildcard(char buffer[]){
     DIR *dir;
     struct dirent *dir_elements;
     char current_path[MAX_PATH];
-    char result[BUFLEN];
+    char result[MAX_COMMAND];
     char *p_result;
     char *p;
-    char *p_tmp;
     int j=0;
-    int i=0;
 
  /*   if(strstr(buffer, "*") == NULL){
         return NULL;
@@ -246,80 +241,15 @@ char *wildcard(char buffer[]){
 
     //文字列を区切り文字で分解する
     p = strtok(buffer, "*\n");        //"*"は1つしか含まれていないものとする
-    p_tmp = p;      //"*"の一つ前のポインタで，*string, string*を処理する時に使う
-    printf("buffer:%s\n", buffer);
     printf("j[%d]:%s\n",j, p);
     strcpy(result, p);
-    //p_tmp = strtok(p, " ");
-    p = strtok(NULL,"*");
+
     //string*
     //*string
     //*のみ
-    if(isgraph(*(p-2))){            //"cp l*s"などの場合は"string*"で処理
-        printf("execute:string*\n");    
-        for(i=0; strncmp((p-2-i), " ", 1) != 0; i++){
-            strcpy(&result[strlen(p_tmp)-i-1], "\0");
-            printf("i:%d, *(p-2-i):%c, result:%s\n", i, *(p-2-i), result);
-        }
-        strcpy(&result[strlen(p_tmp)-i-1], "\0");
-        printf("*(p-2-i):%c, i:%d\n",*(p-1-i), i);
-        printf("*(p-2):%c, i:%d\n",*(p-2), i);
-        printf("i:%d,result:%s, strlen(result):%ld\n", i, result,strlen(result));
-        while((dir_elements = readdir(dir)) != NULL){
-            printf("%s\n", dir_elements->d_name);
-            if(strncmp(dir_elements->d_name, (p-1-i), i) == 0){     //(p-2-i)でなく(p-1-i)であるのは,(p-2-i)が " "であるため
-                printf("+%s\n", dir_elements->d_name);  
-                if((strlen(result)+strlen(dir_elements->d_name)+1) > BUFLEN){//最後に+1は空白分。
-                    printf("length:%ld\n", strlen(result));
-                    printf("0.The command is too long.\n");
-                    return NULL;  
-                }
-                strcat(result, " ");
-                strcat(result, dir_elements->d_name);
-            }
+    //if
 
-        }
-
-    }else if(isgraph(*p) ){
-    //if(strncmp(p, "\n") == 0 || strncmp(p, "\0") == 0 || strncmp(p, " ") == 0/*|| p==NULL */){
-        printf("execute:*string\n");
-        for(i=0; isprint(*(p+i)) && strncmp((p+i)," ",1); i++){
-            
-            printf("i:%d, *(p+i):%c, result:%s, strlen(p_tmp):%ld, strlen(result):%ld\n", i, *(p+i), result,strlen(p_tmp),strlen(result));
-        }//i=6
-        strcpy(&result[strlen(p_tmp)-1], "\0");
-        while((dir_elements = readdir(dir)) != NULL){
-            printf("%s,(dir_elements->d_name-i):%c\n", dir_elements->d_name,*(dir_elements->d_name+strlen(dir_elements->d_name)-i));
-            if(strncmp((dir_elements->d_name+strlen(dir_elements->d_name)-i), p, i) == 0){     //(p-2-i)でなく(p-1-i)であるのは,(p-2-i)が " "であるため
-            //strrchrでもできたかも.でも"ls *s -la"のように*stringの後にも文字が続く場合に対応できなく，コードの複雑さは同じの可能性が高い
-                printf("+%s\n", dir_elements->d_name);  
-                if((strlen(result)+strlen(dir_elements->d_name)+1) > BUFLEN){//最後に+1は空白分
-                    printf("length:%ld\n", strlen(result));
-                    printf("0.The command is too long.\n");
-                    return NULL;  
-                }
-                strcat(result, " ");
-                strcat(result, dir_elements->d_name);
-            }
-           
-        }
-         p = p+i;
-    }else{
-        printf("execute:only *\n");
-        while((dir_elements = readdir(dir)) != NULL){
-            printf("%s\n", dir_elements->d_name);
-            if((strlen(result)+strlen(dir_elements->d_name)+1) > BUFLEN){//最後に+1は空白分。
-                printf("length:%ld\n", strlen(result));
-
-                printf("0.The command is too long.\n");
-                return NULL;  
-            }
-            strcat(result, " ");
-            strcat(result, dir_elements->d_name);
-        }
-    }
-
-   /* while((dir_elements = readdir(dir)) != NULL){
+    while((dir_elements = readdir(dir)) != NULL){
         printf("%s\n", dir_elements->d_name);
         if((strlen(result)+strlen(dir_elements->d_name)+1) > BUFLEN){//最後に+1は空白分。
             printf("length:%ld\n", strlen(result));
@@ -329,9 +259,11 @@ char *wildcard(char buffer[]){
         }
         strcat(result, " ");
         strcat(result, dir_elements->d_name);
-    }*/
-    printf("1.result:%s\n", result);
+    }
+    printf("result:%s\n", result);
 
+
+    p = strtok(NULL,"*");
     if(p!=NULL){
         strcat(result, p);
     }
@@ -553,7 +485,6 @@ alias_tag pTop_alias;
 
 char *str_commands[] = {
     "ls",
-    "pwd",
     "cd",
     "pushd",
     "dirs",
@@ -563,12 +494,10 @@ char *str_commands[] = {
     "!",
     "prompt",
     "alias",
-    "unalias",
-    "rm"
+    "unalias"
 };
 int (*funcs_command[])(char *[]) = {
     &ls,
-    &pwd,
     &cd,
     &pushd,
     &dirs,
@@ -578,8 +507,7 @@ int (*funcs_command[])(char *[]) = {
     &funcs_history,
     &func_prompt,
     &alias,
-    &unalias,
-    &rm
+    &unalias
 }; 
 int num_funcs() {
     return sizeof(str_commands) / sizeof(char *);
@@ -1432,146 +1360,4 @@ int ls(char *args[]){
     return 0;
     
 }
-
-int pwd(char* args[]){
-    char current_path[MAX_PATH];
-    
-    if(getcwd(current_path, MAX_PATH) == NULL){
-        printf("Couldn't get the current directory.\n");
-        return 1;
-    }
-    printf("%s\n", current_path);
-    return 0;
-}
-
-int mv(char* args[]){
-    //p53
-    //ファイルの移動:mv [ファイル名1] [存在しているディレクトリ名2]
-    //ディレクトリの移動:mv [ディレクトリ名1] [存在しているディレクトリ名2] p74
-    //ファイルの名前変更：mv [ファイル名1] [ファイル名2](存在しているファイル名を指定すると上書きされる．)
-    //ディレクトリの名前変更：mv [ディレクトリ名1] [存在しないディレクトリ名2]
-    return 0;
-}
-
-int rm(char* args[]){
-    //p54
-    //rm [なし/-i] [ファイル名]：ファイルを削除する。-iで確認メッセージを表示する
-    //ただしファイルはカレントディレクトリにあるものとする．
-    char current_path[MAX_PATH];
-    char args_file[MAX_COMMAND];
-    char flag=0;
-    char c;
-
-    if(getcwd(current_path, MAX_PATH) == NULL){
-        printf("Couldn't get the current directory.\n");
-        return 1;
-    }
-    printf("%s\n", current_path);
-    int i;
-    if(strcmp(args[1], "-i") == 0){
-        for(i=2; args[i] !=NULL ; i++){
-            if(strlen(args[i]) > MAX_COMMAND){
-                printf("The name of command is too long.\n");
-                return 1;
-            }
-            strcpy(args_file,args[i]);
-            if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
-                printf("The name of the path is too long\n");
-                return 1;
-            }
-            strcat(current_path, "/");
-            strcat(current_path, args_file);
-            printf("%s\n", current_path);
-            printf("rm: remove directory \"%s\"?(y/n):", args_file);
-            c=getchar();
-            if(strncmp(&c, "y", 1)!=0){
-                continue;
-            }
-            if(remove(current_path) == 0){
-                printf("%sを削除しました。\n", args_file);
-            }else{
-                printf("rm:Couldn't remove \"%s\"\n", args_file);
-            }
-        }
- 
-        flag = 1;
-    }else{
-        for(i=1; args[i] !=NULL ; i++){
-            if(strlen(args[i]) > MAX_COMMAND){
-                printf("The name of command is too long.\n");
-                return 1;
-            }
-            strcpy(args_file,args[i]);
-            if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
-                printf("The name of the path is too long\n");
-                return 1;
-            }
-            strcat(current_path, "/");
-            strcat(current_path, args_file);
-            printf("%s\n", current_path);
-            if(strncmp(&c, "y", 1)!=0){
-                continue;
-            }
-            if(remove(current_path) == 0){
-                printf("%sを削除しました。\n", args_file);
-            }else{
-                printf("rm:Couldn't remove \"%s\"\n", args_file);
-            }
-        }
- 
-    }
-
- /*   int i;
-    if((strlen(current_path)+strlen(args_file)+1) > MAX_PATH){//+1は/のため
-        printf("The name of the path is too long\n");
-        return 1;
-    }
-    strcat(current_path, "/");
-    strcat(current_path, args_file);
-    printf("%s\n", current_path);
-
-    if(flag == 1){      //確認メッセージあり
-       printf("rm: remove directory \"%s\"?(y/n):", args_file);
-        c=getchar();
-        if(strncmp(&c, "y", 1)!=0){
-            return 0;
-        }
-    }else{              //確認メッセージなし
-
-    }
-    if(remove(current_path) == 0){
-        printf("%sを削除しました。\n", args_file);
-    }else{
-        printf("rm:Couldn't remove \"%s\"\n", args_file);
-    }
-*/
-    return 0;
-}
-
-
-int mkdir(char* args[]){
-    //mkdir [-p/なし] [ディレクトリ名s]：－pを付けると途中のディレクトリも含めて作成する。
-    //p71
-    return 0;
-}
-
-
-/*int rmdir(char* args[]){
-    //rmdir [-ri/-p/なし] [ディレクトリ名s]:－riを付けると確認しながらディレクトリを削除する。ただし空のディレクトリしか削除できない。
-    //－pを付けると途中のディレクトリも含めて削除する。p72
-    //ディレクトリの削除
-    return 0;
-}*/
-int cat(char* args[]){
-    //cat [-n/-b/なし] [ファイル名]：-nで行番号を，-bで空白を除いて行番号を振って，ファイルの内容を表示する．
-    return 0;
-}
-
-int find(char* args[]){
-    //p57,find ~ -name myfile:~ファイル(ホームディレクトリ)を起点に，myfileを名前検索し，それを画面表示する．
-    //find /bin -name "ch*":ワイルドカードでファイルを検索
-    return 0;
-}
-
-
 /*-- END OF FILE -----------------------------------------------------------*/
